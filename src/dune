@@ -1,0 +1,10 @@
+(executable
+  (name main)
+  (public_name vericaesar)
+  (flags (:standard))
+  (libraries cmdliner))
+
+(coq.extraction
+  (prelude caesar)
+  (extracted_modules caesar)
+  (theories Caesar))
