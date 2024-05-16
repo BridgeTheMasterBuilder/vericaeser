@@ -7,6 +7,7 @@ Require Import Lia.
 Require Import ssreflect.
 Require Import ssrbool.
 Require Import Zify.
+Require Import List.
 
 Ltac Zify.zify_post_hook ::= Z.div_mod_to_equations.
 
@@ -64,9 +65,7 @@ Definition ascii_of_Z (n : Z) := ascii_of_nat (Z.to_nat n).
 
 Definition is_uppercase_encoded (c : ascii) : Prop := 0 <= Z_of_ascii c < alphabet_size.
 
-Definition text := { s : string | String.Forall is_uppercase_encoded s }.
-
-Print string_ind.
+Definition text := { s : string | Forall is_uppercase_encoded (list_ascii_of_string s) }.
 
 Definition encode (c : ascii) : ascii :=
   ascii_of_Z (Z_of_ascii c - ascii_A).
@@ -90,7 +89,7 @@ Program Definition text_of_string (s : string) : option text :=
     | false => None
   end.
 Next Obligation.
-  elim => //=; first by constructor.
+  elim => //=.
   move => c s' IHs'.
   move => /(@eq_sym bool) /andP [H1 H2].
   autounfold with caesar_db.
@@ -107,7 +106,7 @@ Next Obligation.
 Qed.
 
 Program Definition encrypted (ciphertext : text) (plaintext : text) (k : Z) : Prop :=
-  String.Forall2 (fun c' c => c' = shift k c) ciphertext plaintext.
+  Forall2 (fun c' c => c' = shift k c) (list_ascii_of_string ciphertext) (list_ascii_of_string plaintext).
 
 Program Definition decrypted (plaintext : text) (ciphertext : text) (k : Z) : Prop :=
   encrypted plaintext ciphertext (-k).
