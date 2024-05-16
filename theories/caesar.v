@@ -16,6 +16,8 @@ Set Implicit Arguments.
 Unset Strict Implicit.
 Unset Printing Implicit Defensive.
 
+Create HintDb caesar_db.
+
 Open Scope Z_scope.
 
 Definition alphabet_size := 26.
@@ -62,6 +64,10 @@ Definition ascii_of_Z (n : Z) := ascii_of_nat (Z.to_nat n).
 
 Definition is_uppercase_encoded (c : ascii) : Prop := 0 <= Z_of_ascii c < alphabet_size.
 
+Definition text := { s : string | String.Forall is_uppercase_encoded s }.
+
+Print string_ind.
+
 Definition encode (c : ascii) : ascii :=
   ascii_of_Z (Z_of_ascii c - ascii_A).
 
@@ -70,7 +76,6 @@ Definition decode (c : ascii) : ascii :=
 
 Definition shifted k c := { c' : ascii | Z_of_ascii c' = (Z_of_ascii c + k) mod alphabet_size }.
 
-Create HintDb caesar_db.
 Hint Unfold alphabet_size ascii_A thirteen is_ascii_uppercase is_uppercase_encoded proj1_sig Z_of_ascii ascii_of_Z encode decode : caesar_db.
 
 Program Definition shift (k : Z) (c : ascii) : shifted k c :=
@@ -78,50 +83,6 @@ Program Definition shift (k : Z) (c : ascii) : shifted k c :=
 Next Obligation.
   autounfold with caesar_db; move => * //=; rewrite nat_ascii_embedding; lia.
 Qed.
-
-Definition text := { s : string | String.Forall is_uppercase_encoded s }.
-
-Program Definition encrypted (ciphertext : text) (plaintext : text) (k : Z) : Prop :=
-  String.Forall2 (fun c' c => c' = shift k c) ciphertext plaintext.
-
-Program Definition decrypted (ciphertext : text) (plaintext : text) (k : Z) : Prop :=
-  encrypted plaintext ciphertext (-k).
-
-Hint Unfold shift encrypted decrypted : caesar_db.
-
-Program Lemma encrypt_preserves_encoding : forall (s : text) (k : Z), Forall is_uppercase_encoded (map (fun c => shift k c) s).
-Proof.
-  move => [s H] k; autounfold with caesar_db.
-  elim s.
-  - constructor.
-  - move => c s' IHs' //=.
-    constructor; auto.
-    autounfold with caesar_db; rewrite nat_ascii_embedding; lia.
-Qed.
-
-Program Lemma encrypt_correct : forall (s : text) (k : Z)
-    (H : String.Forall is_uppercase_encoded (String.map (fun c => shift k c) s)),
-    encrypted (String.map (fun c => shift k c) s) s k.
-Proof.
-   move => [s H] k H'; autounfold with caesar_db.
-  elim s.
-  - constructor.
-  - move => c s' IHs' //=.
-    constructor; auto.
-Qed.
-
-Program Definition encrypt (s : text) (k : Z) : { s' : text | encrypted s' s k } :=
-  String.map (fun c => shift k c) s.
-Next Obligation.
-  apply encrypt_preserves_encoding.
-Qed.
-Next Obligation.
-  move => s k.
-  apply encrypt_correct.
-Qed.
-
-Program Definition decrypt (s : text) (k : Z) : { s' : text | decrypted s s' k } :=
-  encrypt s (-k).
 
 Program Definition text_of_string (s : string) : option text :=
   match String.forallb is_ascii_uppercase s with
@@ -145,4 +106,74 @@ Next Obligation.
   destruct c; repeat match goal with [ b : bool |- _ ] => destruct b end; inversion H2; auto.
 Qed.
 
+Program Definition encrypted (ciphertext : text) (plaintext : text) (k : Z) : Prop :=
+  String.Forall2 (fun c' c => c' = shift k c) ciphertext plaintext.
+
+Program Definition decrypted (plaintext : text) (ciphertext : text) (k : Z) : Prop :=
+  encrypted plaintext ciphertext (-k).
+
+Hint Unfold shift encrypted decrypted : caesar_db.
+
+Program Definition encrypt (s : text) (k : Z) : { s' : text | encrypted s' s k } :=
+  String.map (fun c => shift k c) s.
+Next Obligation.
+  move => [s H] k; autounfold with caesar_db.
+  elim s.
+  - constructor.
+  - move => c s' IHs' //=.
+    constructor; auto.
+    autounfold with caesar_db; rewrite nat_ascii_embedding; lia.
+Qed.
+Next Obligation.
+  move => [s H] k; autounfold with caesar_db.
+  elim s.
+  - constructor.
+  - move => c s' IHs' //=.
+    constructor; auto.
+Qed.
+
+Program Definition decrypt (s : text) (k : Z) : { s' : text | decrypted s' s k } :=
+  encrypt s (-k).
+
 Definition rot13 (s : text) : { s' | encrypted s' s thirteen } := encrypt s thirteen.
+
+Lemma encrypt_id : forall (s : text), (` (` (encrypt s 0))) = (` s).
+Proof.
+  move => [s H] //=.
+  induction s as [| c s IHs].
+  - easy.
+  - move => //=; f_equal; inversion H as [| ? ? [H1 H2]]; subst.
+    + destruct c; repeat match goal with [ b : bool |- _ ] => destruct b end; inversion H2; auto.
+    + now apply IHs.
+Qed.
+
+Lemma encrypt_mod : forall (s : text) (k : Z), (` (` (encrypt s k))) = (` (` (encrypt s (k mod alphabet_size)))).
+Proof.
+  move => [s H] k //=.
+  induction s as [| c s IHs].
+  - easy.
+  - simpl; f_equal; inversion H; subst.
+    + f_equal. now rewrite Zplus_mod_idemp_r.
+    + now apply IHs.
+Qed.
+
+Lemma encrypt_trans : forall (s : text) (k l : Z),
+    (` (` (encrypt (` (encrypt s k)) l))) = (` (` (encrypt s (k + l)))).
+Proof.
+  move => [s H] k l //=.
+  induction s as [| c s IHs].
+  - easy.
+  - simpl; f_equal.
+    + autounfold with caesar_db.
+      rewrite nat_ascii_embedding; [| f_equal ]; lia.
+    + inversion H; now apply IHs.
+Qed.
+
+Corollary rot13_involutive : forall (s : text), (` (` (rot13 (` (rot13 s))))) = (` s).
+Proof.
+  move => s.
+  unfold rot13, thirteen; rewrite encrypt_trans.
+  rewrite encrypt_mod. unfold alphabet_size.
+  change ((13 + 13) mod 26) with 0.
+  apply encrypt_id.
+Qed.
