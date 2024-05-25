@@ -80,8 +80,8 @@ Definition text_ind : forall P : text -> Prop,
            P (exist _ s H1) -> P (exist _ (String c s) H2)) ->
        forall t : text, P t.
   move => P base step.
-  case; elim => //=; unfold string_is_uppercase_encoded.
-  by move => c ? ? H; inversion H as [|? ? ? H']; apply (step _ _ H' _).
+  case; elim => //=; move => ? ? ? H.
+  by inversion H as [|? ? ? H']; apply (step _ _ H' _).
 Qed.
 
 Definition encode (c : ascii) : ascii :=
@@ -97,7 +97,7 @@ Qed.
 
 Lemma decode_correct : forall (c : ascii), is_uppercase_encoded c -> is_ascii_uppercase (decode c).
 Proof.
-  move => [[] [] [] [] [] [] [] []] []; easy.
+  move => [[] [] [] [] [] [] [] []] []; move => ? H; inversion H; easy.
 Qed.
 
 Definition shifted k c := { c' : ascii | Z_of_ascii c' = (Z_of_ascii c + k) mod alphabet_size }.
@@ -142,7 +142,7 @@ Program Definition encrypt (s : text) (k : Z) : { s' : text | encrypted s' s k }
   String.map (fun c => shift k c) s.
 Next Obligation.
   elim/text_ind => //=.
-  unfold string_is_uppercase_encoded.
+  unfold string_is_uppercase_encoded, String.map.
   move => ? ? ? /Forall_cons_iff [? ?] ? ?.
   constructor => //=; autounfold with caesar_db; rewrite nat_ascii_embedding; lia.
 Qed.
@@ -170,7 +170,7 @@ Lemma encrypt_mod : forall (s : text) (k : Z), (` (` (encrypt s k))) = (` (` (en
 Proof.
   elim/text_ind => //=.
   autounfold with caesar_db.
-  move => c ? ? /Forall_cons_iff [[? ?] ?] ? ?; f_equal => //=.
+  move => ? ? ? /Forall_cons_iff [[? ?] ?] ? ?; f_equal => //=.
   by rewrite Zplus_mod_idemp_r.
 Qed.
 
@@ -187,7 +187,7 @@ Corollary rot13_involutive : forall (s : text), (` (` (rot13 (` (rot13 s))))) = 
 Proof.
   move => s.
   unfold rot13, thirteen; rewrite encrypt_trans.
-  rewrite encrypt_mod. unfold alphabet_size.
+  rewrite encrypt_mod; unfold alphabet_size.
   change ((13 + 13) mod 26) with 0.
   apply encrypt_id.
 Qed.

@@ -1,5 +1,6 @@
 Require Extraction.
 Require Import Caesar.caesar.
+Require Import Caesar.String.
 Require Import ZArith.
 Require Import ExtrOcamlBasic.
 Require Import ExtrOcamlNativeString.
@@ -17,6 +18,9 @@ Extract Inlined Constant thirteen => "13".
 Extract Constant is_ascii_uppercase => "fun c -> Char.(compare c (uppercase_ascii c)) = 0".
 Extract Inlined Constant Z_of_ascii => "Char.code".
 Extract Inlined Constant ascii_of_Z => "Char.chr".
+
+Extract Inlined Constant String.map => "String.map".
+Extract Inlined Constant String.forallb => "String.for_all".
 
 Set Extraction Output Directory ".".
 
